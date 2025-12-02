@@ -1,38 +1,42 @@
-# 基础镜像：NVIDIA 官方 CUDA + Ubuntu
-FROM nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04
+# 使用 NVIDIA 官方 CUDA 11.8 + Ubuntu20.04 基础镜像
+FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu20.04
 
-# 安装必要工具
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# 环境变量设置（避免交互安装，保证Python输出直接刷新）
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    TORCH_CUDA_VERSION=cu118
+
+# 1. 基础工具安装
+RUN apt-get update && apt-get install -y \
     git \
+    python3.8 \
+    python3.8-dev \
+    python3-pip \
+    python3-setuptools \
+    python3-wheel \
     build-essential \
-    curl \
     && rm -rf /var/lib/apt/lists/*
 
-# 安装 Miniconda
-ENV CONDA_DIR=/opt/conda
-RUN curl -fsSL https://repo.anaconda.com/miniconda/Miniconda3-py38_4.12.0-Linux-x86_64.sh -o /tmp/miniconda.sh \
-    && bash /tmp/miniconda.sh -b -p $CONDA_DIR \
-    && rm /tmp/miniconda.sh
-ENV PATH=$CONDA_DIR/bin:$PATH
+# 2. 设置 python3.8 为默认 python
+RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.8 1
 
-# 创建并激活 Conda 环境
-RUN conda create -n orion python=3.8 -y
-SHELL ["conda", "run", "-n", "orion", "/bin/bash", "-c"]
+# 3. 工作目录
+WORKDIR /workspace
 
-# 克隆项目
-WORKDIR /app
+# 4. 克隆 Orion 项目 (直接从上游仓库拉取代码)
 RUN git clone https://github.com/xiaomi-mlab/Orion.git .
-# 切换到子目录（假设项目需要）
-WORKDIR /app/ORION
 
-# 安装 PyTorch CUDA 11.8 版本
-RUN conda run -n orion pip install torch==2.4.1+cu118 torchvision==0.19.1+cu118 torchaudio==2.4.1 --index-url https://download.pytorch.org/whl/cu118
+# 5. 安装 PyTorch GPU 版本（与 cu118 匹配）
+RUN pip install --no-cache-dir torch==2.4.1+cu118 torchvision==0.19.1+cu118 torchaudio==2.4.1 \
+    --index-url https://download.pytorch.org/whl/cu118
 
-# 安装项目（可编辑模式）
-RUN conda run -n orion pip install -v -e .
+# 6. 安装 Orion 项目 (editable mode)
+RUN pip install -v -e .
 
-# 安装 requirements.txt
-RUN conda run -n orion pip install -r requirements.txt
+# 7. 安装项目额外依赖
+RUN pip install --no-cache-dir -r requirements.txt
 
-# 设置容器启动命令（进入 Conda 环境）
-CMD ["conda", "run", "-n", "orion", "python", "main.py"]
+# 8. 容器默认启动命令（可以进入 bash 交互）
+CMD ["/bin/bash"]
+
