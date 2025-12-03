@@ -6,8 +6,8 @@ on:
   workflow_dispatch:
 
 env:
-  IMAGE: lzycmcy/orion_my           # 你的镜像仓库
-  BUILDER_ENDPOINT: lzycmcy/lzymy   # Cloud builder，使用短形式即可
+  IMAGE: lzycmcy/orion_my
+  BUILDER_ENDPOINT: lzycmcy/lzymy
 
 jobs:
   docker:
@@ -16,12 +16,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 必须先登录，再 setup buildx（cloud 访问需要已认证）
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
-          username: ${{ vars.DOCKER_USER }}     # 建议用变量；或直接写 lzycmcy
-          password: ${{ secrets.DOCKER_PAT }}   # 必须是 Docker Hub Access Token
+          username: lzycmcy
+          password: ${{ secrets.LZYCMCY }}
 
       - name: Set up Docker Buildx (Cloud)
         id: buildx
@@ -30,12 +29,11 @@ jobs:
           driver: cloud
           endpoint: ${{ env.BUILDER_ENDPOINT }}
 
-      # 调试：确认 builder 已连接并且可用
       - name: Debug builders
         run: |
           docker buildx version
-          docker buildx ls || true
-          docker buildx inspect "${{ steps.buildx.outputs.name }}" || true
+          docker buildx ls
+          docker buildx inspect "${{ steps.buildx.outputs.name }}"
 
       - name: Build and push
         uses: docker/build-push-action@v6
@@ -45,5 +43,4 @@ jobs:
           push: true
           platforms: linux/amd64
           tags: ${{ env.IMAGE }}:latest
-          cache-from: type=registry,ref=${{ env.IMAGE }}:buildcache
-          cache-to: type=registry,ref=${{ env.IMAGE }}:buildcache,mode=max
+
